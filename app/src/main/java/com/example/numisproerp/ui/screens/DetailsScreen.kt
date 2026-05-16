@@ -83,6 +83,7 @@ fun DetailsScreen(
     var sales by remember { mutableStateOf<List<Sale>>(emptyList()) }
     var supplierNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var clientNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var productNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
 
     var selectedSupplierIds by remember { mutableStateOf<Set<String>>(emptySet()) }
     var selectedClientIds by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -100,8 +101,10 @@ fun DetailsScreen(
 
     val unknownSupplierText = tr("Невідомий постачальник", "Unknown supplier")
     val unknownClientText = tr("Невідомий клієнт", "Unknown client")
+    val unknownProductText = tr("Невідомий товар", "Unknown item")
     val purchaseLabel = tr("Закупівля", "Purchase")
     val saleLabel = tr("Продаж", "Sale")
+    val pcsLabel = tr("шт.", "pcs")
 
     val filteredPurchases by remember(purchases, selectedSupplierIds, sortMode, supplierNames) {
         derivedStateOf {
@@ -131,6 +134,15 @@ fun DetailsScreen(
 
     LaunchedEffect(type) {
         kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            val productMap = mutableMapOf<String, String>()
+            suspend fun resolveProductNames(catalogIds: List<String>) {
+                catalogIds.distinct().forEach { catalogId ->
+                    if (catalogId !in productMap) {
+                        val product = database.productDao().getProductById(catalogId)
+                        productMap[catalogId] = product?.name ?: unknownProductText
+                    }
+                }
+            }
             when (type) {
                 "purchases" -> {
                     purchases = database.purchaseDao().getAllPurchases()
@@ -140,6 +152,7 @@ fun DetailsScreen(
                         supplierMap[supplierId] = supplier?.name ?: unknownSupplierText
                     }
                     supplierNames = supplierMap
+                    resolveProductNames(purchases.map { it.catalogId })
                 }
                 "profit" -> {
                     sales = database.saleDao().getAllSales()
@@ -149,6 +162,7 @@ fun DetailsScreen(
                         clientMap[clientId] = client?.name ?: unknownClientText
                     }
                     clientNames = clientMap
+                    resolveProductNames(sales.map { it.catalogId })
                 }
                 else -> { // balance
                     purchases = database.purchaseDao().getAllPurchases()
@@ -165,8 +179,10 @@ fun DetailsScreen(
                         clientMap[clientId] = client?.name ?: unknownClientText
                     }
                     clientNames = clientMap
+                    resolveProductNames(purchases.map { it.catalogId } + sales.map { it.catalogId })
                 }
             }
+            productNames = productMap
             isLoading = false
         }
     }
@@ -365,9 +381,11 @@ fun DetailsScreen(
                             items(filteredPurchases) { purchase ->
                                 TransactionDetailItem(
                                     date = purchase.date,
-                                    description = purchaseLabel,
+                                    description = "$purchaseLabel • ${productNames[purchase.catalogId] ?: unknownProductText}",
                                     counterparty = supplierNames[purchase.supplierId] ?: unknownSupplierText,
-                                    amount = -purchase.totalAmount,
+                                    quantity = purchase.quantity,
+                                    pcsLabel = pcsLabel,
+                                    amount = purchase.totalAmount,
                                     isPurchase = true
                                 )
                             }
@@ -376,8 +394,10 @@ fun DetailsScreen(
                             items(filteredSales) { sale ->
                                 TransactionDetailItem(
                                     date = sale.date,
-                                    description = saleLabel,
+                                    description = "$saleLabel • ${productNames[sale.catalogId] ?: unknownProductText}",
                                     counterparty = clientNames[sale.clientId] ?: unknownClientText,
+                                    quantity = sale.quantity,
+                                    pcsLabel = pcsLabel,
                                     amount = sale.totalAmount,
                                     isPurchase = false
                                 )
@@ -468,6 +488,8 @@ fun TransactionDetailItem(
     date: Long,
     description: String,
     counterparty: String,
+    quantity: Int,
+    pcsLabel: String,
     amount: Double,
     isPurchase: Boolean
 ) {
@@ -496,10 +518,11 @@ fun TransactionDetailItem(
                 Text(
                     text = description,
                     fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp
+                    fontSize = 14.sp,
+                    maxLines = 2
                 )
                 Text(
-                    text = "$counterparty • ${dateFormat.format(Date(date))}",
+                    text = "$counterparty • $quantity $pcsLabel • ${dateFormat.format(Date(date))}",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 )
