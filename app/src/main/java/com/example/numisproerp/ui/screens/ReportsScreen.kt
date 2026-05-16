@@ -666,8 +666,8 @@ fun MonthlyDynamicsChart(monthly: List<MonthlyStats>) {
         }
     }
 
-    val maxValueRaw = data.maxOfOrNull { max(max(it.revenue, it.expenses), it.profit) } ?: 0.0
-    val minValueRaw = data.minOfOrNull { kotlin.math.min(kotlin.math.min(it.revenue, it.expenses), it.profit) } ?: 0.0
+    val maxValueRaw = data.maxOfOrNull { max(it.expenses, it.profit) } ?: 0.0
+    val minValueRaw = data.minOfOrNull { kotlin.math.min(it.expenses, it.profit) } ?: 0.0
     val niceMax = niceCeil(maxValueRaw)
     val niceMin = if (minValueRaw < 0.0) -niceCeil(-minValueRaw) else 0.0
     val span = (niceMax - niceMin).coerceAtLeast(1.0)
@@ -706,7 +706,6 @@ fun MonthlyDynamicsChart(monthly: List<MonthlyStats>) {
                     fontWeight = FontWeight.SemiBold
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ChartLegendDot(color = AccentGreen, label = tr("Дохід", "Revenue"))
                     ChartLegendDot(color = AccentRed, label = tr("Витрати", "Expenses"))
                     ChartLegendDot(color = AccentOrange, label = tr("Прибуток", "Profit"))
                 }
@@ -797,7 +796,6 @@ fun MonthlyDynamicsChart(monthly: List<MonthlyStats>) {
                         }
                     }
 
-                    drawSeries(data.map { it.revenue }, AccentGreen)
                     drawSeries(data.map { it.expenses }, AccentRed)
                     drawSeries(data.map { it.profit }, AccentOrange)
                 }

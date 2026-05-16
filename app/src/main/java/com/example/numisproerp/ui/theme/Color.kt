@@ -44,6 +44,9 @@ val AccentGreen = IOSGreen
 val AccentBlue = IOSBlue
 val AccentRed = IOSRed
 val AccentOrange = IOSOrange
+val AccentTeal = IOSTeal
+val AccentYellow = IOSYellow
+val AccentPurple = IOSPurple
 
 // Сумісність зі старими назвами
 val Purple40 = IOSBlue

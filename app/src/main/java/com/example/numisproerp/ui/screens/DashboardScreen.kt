@@ -53,7 +53,10 @@ import com.numisproerp.ui.navigation.Screen
 import com.numisproerp.ui.theme.AccentBlue
 import com.numisproerp.ui.theme.AccentGreen
 import com.numisproerp.ui.theme.AccentOrange
+import com.numisproerp.ui.theme.AccentPurple
 import com.numisproerp.ui.theme.AccentRed
+import com.numisproerp.ui.theme.AccentTeal
+import com.numisproerp.ui.theme.AccentYellow
 import com.numisproerp.ui.theme.IOSDesign
 import com.numisproerp.ui.theme.IOSIconChip
 import com.numisproerp.ui.theme.LocalAppTheme
@@ -356,24 +359,28 @@ fun QuickAccessRow(
         QuickAccessButton(
             icon = Icons.Outlined.LocalAtm,
             tileRes = R.drawable.tile_purchase,
+            lightTint = AccentOrange,
             label = tr("Закупівля", "Purchase"),
             onClick = onPurchaseClick
         )
         QuickAccessButton(
             icon = Icons.Filled.ShoppingCart,
             tileRes = R.drawable.tile_sale,
+            lightTint = AccentGreen,
             label = tr("Продаж", "Sale"),
             onClick = onSaleClick
         )
         QuickAccessButton(
             icon = Icons.Filled.Store,
             tileRes = R.drawable.tile_stock,
+            lightTint = AccentBlue,
             label = tr("Склад", "Stock"),
             onClick = onStockClick
         )
         QuickAccessButton(
             icon = Icons.Filled.People,
             tileRes = R.drawable.tile_clients,
+            lightTint = AccentTeal,
             label = tr("Клієнти", "Clients"),
             onClick = onClientsClick
         )
@@ -394,24 +401,28 @@ fun QuickAccessRow2(
         QuickAccessButton(
             icon = Icons.Outlined.BarChart,
             tileRes = R.drawable.tile_reports,
+            lightTint = AccentYellow,
             label = tr("Звіти", "Reports"),
             onClick = onReportsClick
         )
         QuickAccessButton(
             icon = Icons.Filled.People,
             tileRes = R.drawable.tile_suppliers,
+            lightTint = AccentPurple,
             label = tr("Постачальники", "Suppliers"),
             onClick = onSuppliersClick
         )
         QuickAccessButton(
             icon = Icons.Outlined.Receipt,
             tileRes = R.drawable.tile_expenses,
+            lightTint = AccentRed,
             label = tr("Витрати", "Expenses"),
             onClick = onExpensesClick
         )
         QuickAccessButton(
             icon = Icons.Outlined.BarChart,
             tileRes = R.drawable.tile_collection,
+            lightTint = AccentBlue,
             label = tr("Моя колекція", "Collection"),
             onClick = onDocumentsClick
         )
@@ -423,6 +434,7 @@ fun QuickAccessButton(
     modifier: Modifier = Modifier,
     icon: ImageVector,
     tileRes: Int,
+    lightTint: Color = Color.Unspecified,
     label: String,
     onClick: () -> Unit
 ) {
@@ -445,24 +457,39 @@ fun QuickAccessButton(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(top = 6.dp, bottom = 4.dp, start = 4.dp, end = 4.dp)
         ) {
-            if (theme == AppTheme.OLEG_SMILE || theme == AppTheme.OLEG_SMILE_V2 || theme == AppTheme.OLEG_SMILE_LIGHT) {
-                Image(
-                    painter = painterResource(id = tileRes),
-                    contentDescription = label,
-                    modifier = Modifier
-                        .size(68.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                )
-            } else {
-                IOSIconChip(
-                    icon = icon,
-                    tint = MaterialTheme.colorScheme.primary,
-                    chipSize = 68.dp,
-                    iconSize = 36.dp,
-                    cornerRadius = 14.dp,
-                    backgroundAlpha = 0.12f,
-                    contentDescription = label
-                )
+            when (theme) {
+                AppTheme.OLEG_SMILE, AppTheme.OLEG_SMILE_V2 -> {
+                    Image(
+                        painter = painterResource(id = tileRes),
+                        contentDescription = label,
+                        modifier = Modifier
+                            .size(68.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                    )
+                }
+                AppTheme.OLEG_SMILE_LIGHT -> {
+                    val resolvedTint = if (lightTint != Color.Unspecified) lightTint else MaterialTheme.colorScheme.primary
+                    IOSIconChip(
+                        icon = icon,
+                        tint = resolvedTint,
+                        chipSize = 68.dp,
+                        iconSize = 36.dp,
+                        cornerRadius = 14.dp,
+                        backgroundAlpha = 0.18f,
+                        contentDescription = label
+                    )
+                }
+                else -> {
+                    IOSIconChip(
+                        icon = icon,
+                        tint = MaterialTheme.colorScheme.primary,
+                        chipSize = 68.dp,
+                        iconSize = 36.dp,
+                        cornerRadius = 14.dp,
+                        backgroundAlpha = 0.12f,
+                        contentDescription = label
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
