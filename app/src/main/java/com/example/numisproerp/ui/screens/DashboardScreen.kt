@@ -535,10 +535,12 @@ fun QuickAccessButton(
                 }
                 AppTheme.OLEG_SMILE_PREMIUM -> {
                     // Нова "Преміум 3D" тема — яскраві 3D-плитки (tile_premium_*).
-                    val res = premiumTileRes ?: lightTileRes
-                    if (res != null) {
+                    // Якщо для розділу немає преміум-плитки (напр. "Витрати"),
+                    // показуємо нейтральний векторний chip замість light-плитки,
+                    // щоб не змішувати стилі двох різних тем.
+                    if (premiumTileRes != null) {
                         Image(
-                            painter = painterResource(id = res),
+                            painter = painterResource(id = premiumTileRes),
                             contentDescription = label,
                             modifier = Modifier.size(68.dp)
                         )
