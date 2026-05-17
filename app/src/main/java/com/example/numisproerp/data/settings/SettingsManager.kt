@@ -195,6 +195,48 @@ class SettingsManager @Inject constructor(
             prefs.edit().putString(KEY_BG_IMAGE_PATH, value).apply()
         }
 
+    // ==================== ЗНАЧКИ ГОЛОВНОГО МЕНЮ ====================
+    // Користувач може завантажити власне фото на кожну плитку швидкого доступу
+    // ("Закупівля", "Продаж", і т.д.) і регулювати прозорість фону плитки.
+    // Шляхи зберігаються по одному ключу на плитку (`tile_photo_<id>`), а агрегований
+    // мап подається в Compose через [tilePhotoPathsState] для реактивної перерисовки.
+
+    private fun loadTilePhotoPaths(): Map<String, String> =
+        TILE_IDS.mapNotNull { id ->
+            val path = prefs.getString("$KEY_TILE_PHOTO_PREFIX$id", "") ?: ""
+            if (path.isNotBlank()) id to path else null
+        }.toMap()
+
+    private val _tilePhotoPaths: MutableState<Map<String, String>> =
+        mutableStateOf(loadTilePhotoPaths())
+
+    val tilePhotoPathsState: MutableState<Map<String, String>>
+        get() = _tilePhotoPaths
+
+    fun getTilePhotoPath(tileId: String): String =
+        _tilePhotoPaths.value[tileId].orEmpty()
+
+    fun setTilePhotoPath(tileId: String, path: String) {
+        val newMap = _tilePhotoPaths.value.toMutableMap()
+        if (path.isBlank()) newMap.remove(tileId) else newMap[tileId] = path
+        _tilePhotoPaths.value = newMap.toMap()
+        prefs.edit().putString("$KEY_TILE_PHOTO_PREFIX$tileId", path).apply()
+    }
+
+    private val _tileBackgroundAlpha: MutableState<Float> =
+        mutableStateOf(prefs.getFloat(KEY_TILE_BG_ALPHA, DEFAULT_TILE_BG_ALPHA))
+
+    val tileBackgroundAlphaState: MutableState<Float>
+        get() = _tileBackgroundAlpha
+
+    var tileBackgroundAlpha: Float
+        get() = _tileBackgroundAlpha.value
+        set(value) {
+            val clamped = value.coerceIn(0f, 1f)
+            _tileBackgroundAlpha.value = clamped
+            prefs.edit().putFloat(KEY_TILE_BG_ALPHA, clamped).apply()
+        }
+
     companion object {
         private const val PREFS_NAME = "numispro_settings"
         private const val KEY_THEME = "app_theme"
@@ -206,11 +248,25 @@ class SettingsManager @Inject constructor(
         private const val KEY_FONT_FAMILY = "font_family"
         private const val KEY_FONT_COLOR = "font_color"
         private const val KEY_BG_IMAGE_PATH = "bg_image_path"
+        private const val KEY_TILE_PHOTO_PREFIX = "tile_photo_"
+        private const val KEY_TILE_BG_ALPHA = "tile_bg_alpha"
         const val DEFAULT_LOW_STOCK_THRESHOLD = 3
         const val MAX_LOW_STOCK_THRESHOLD = 20
         const val DEFAULT_FONT_SIZE = 14
         const val MIN_FONT_SIZE = 10
         const val MAX_FONT_SIZE = 24
         const val DEFAULT_FONT_FAMILY = "system"
+        // Початкове значення збігається з попереднім жорстким `surface.copy(alpha = 0.55f)`
+        // у [DashboardScreen.QuickAccessButton], щоб старі користувачі не побачили
+        // зміни в зовнішньому вигляді одразу після оновлення.
+        const val DEFAULT_TILE_BG_ALPHA = 0.55f
+        /**
+         * Ідентифікатори всіх плиток швидкого доступу головного меню.
+         * Збігаються з `tileId`, який передається у [QuickAccessButton].
+         */
+        val TILE_IDS = listOf(
+            "purchase", "sale", "stock", "clients",
+            "reports", "suppliers", "expenses", "collection"
+        )
     }
 }

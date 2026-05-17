@@ -62,7 +62,13 @@ import com.numisproerp.ui.theme.AccentYellow
 import com.numisproerp.ui.theme.IOSDesign
 import com.numisproerp.ui.theme.IOSIconChip
 import com.numisproerp.ui.theme.LocalAppTheme
+import com.numisproerp.ui.theme.LocalTileBackgroundAlpha
+import com.numisproerp.ui.theme.LocalUserTilePhotos
 import com.numisproerp.ui.theme.OlegPremiumTitleCoral
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import androidx.compose.ui.layout.ContentScale
+import java.io.File
 import com.numisproerp.ui.viewmodel.DashboardViewModel
 import com.numisproerp.ui.viewmodel.DashboardData
 import com.numisproerp.ui.viewmodel.RecentTransaction
@@ -407,6 +413,7 @@ fun QuickAccessRow(
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         QuickAccessButton(
+            tileId = "purchase",
             icon = Icons.Outlined.LocalAtm,
             tileRes = R.drawable.tile_purchase,
             lightTileRes = R.drawable.tile_light_purchase,
@@ -416,6 +423,7 @@ fun QuickAccessRow(
             onClick = onPurchaseClick
         )
         QuickAccessButton(
+            tileId = "sale",
             icon = Icons.Filled.ShoppingCart,
             tileRes = R.drawable.tile_sale,
             lightTileRes = R.drawable.tile_light_sale,
@@ -425,6 +433,7 @@ fun QuickAccessRow(
             onClick = onSaleClick
         )
         QuickAccessButton(
+            tileId = "stock",
             icon = Icons.Filled.Store,
             tileRes = R.drawable.tile_stock,
             lightTileRes = R.drawable.tile_light_stock,
@@ -434,6 +443,7 @@ fun QuickAccessRow(
             onClick = onStockClick
         )
         QuickAccessButton(
+            tileId = "clients",
             icon = Icons.Filled.People,
             tileRes = R.drawable.tile_clients,
             lightTileRes = R.drawable.tile_light_clients,
@@ -457,6 +467,7 @@ fun QuickAccessRow2(
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         QuickAccessButton(
+            tileId = "reports",
             icon = Icons.Outlined.BarChart,
             tileRes = R.drawable.tile_reports,
             lightTileRes = R.drawable.tile_light_reports,
@@ -466,6 +477,7 @@ fun QuickAccessRow2(
             onClick = onReportsClick
         )
         QuickAccessButton(
+            tileId = "suppliers",
             icon = Icons.Filled.People,
             tileRes = R.drawable.tile_suppliers,
             lightTileRes = R.drawable.tile_light_suppliers,
@@ -475,6 +487,7 @@ fun QuickAccessRow2(
             onClick = onSuppliersClick
         )
         QuickAccessButton(
+            tileId = "expenses",
             icon = Icons.Outlined.Receipt,
             tileRes = R.drawable.tile_expenses,
             lightTileRes = R.drawable.tile_light_expenses,
@@ -483,6 +496,7 @@ fun QuickAccessRow2(
             onClick = onExpensesClick
         )
         QuickAccessButton(
+            tileId = "collection",
             icon = Icons.Outlined.BarChart,
             tileRes = R.drawable.tile_collection,
             lightTileRes = R.drawable.tile_light_collection,
@@ -497,6 +511,13 @@ fun QuickAccessRow2(
 @Composable
 fun QuickAccessButton(
     modifier: Modifier = Modifier,
+    /**
+     * Стабільний ідентифікатор плитки. Має збігатися зі значеннями
+     * [com.numisproerp.data.settings.SettingsManager.TILE_IDS].
+     * Використовується для пошуку користувацького фото в [LocalUserTilePhotos]
+     * та для збереження в SharedPreferences з ключем `tile_photo_<tileId>`.
+     */
+    tileId: String,
     icon: ImageVector,
     tileRes: Int,
     lightTileRes: Int? = null,
@@ -511,7 +532,9 @@ fun QuickAccessButton(
     onClick: () -> Unit
 ) {
     val theme = LocalAppTheme.current
-    if (theme == AppTheme.OLEG_SMILE_PREMIUM) {
+    val userPhotoPath = LocalUserTilePhotos.current[tileId].orEmpty()
+    val bgAlpha = LocalTileBackgroundAlpha.current.coerceIn(0f, 1f)
+    if (theme == AppTheme.OLEG_SMILE_PREMIUM && userPhotoPath.isBlank()) {
         PremiumQuickAccessButton(
             modifier = modifier,
             icon = icon,
@@ -531,7 +554,7 @@ fun QuickAccessButton(
             .size(width = tileWidth, height = tileHeight)
             .clip(RoundedCornerShape(tileCorner))
             .background(
-                MaterialTheme.colorScheme.surface.copy(alpha = 0.55f)
+                MaterialTheme.colorScheme.surface.copy(alpha = bgAlpha)
             ),
         contentAlignment = Alignment.TopCenter
     ) {
@@ -539,7 +562,9 @@ fun QuickAccessButton(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(top = 6.dp, bottom = 4.dp, start = 4.dp, end = 4.dp)
         ) {
-            when (theme) {
+            if (userPhotoPath.isNotBlank()) {
+                UserTilePhoto(path = userPhotoPath, label = label, size = 68.dp, corner = 14.dp)
+            } else when (theme) {
                 AppTheme.OLEG_SMILE, AppTheme.OLEG_SMILE_V2 -> {
                     Image(
                         painter = painterResource(id = tileRes),
@@ -548,6 +573,25 @@ fun QuickAccessButton(
                             .size(68.dp)
                             .clip(RoundedCornerShape(14.dp))
                     )
+                }
+                AppTheme.OLEG_SMILE_PREMIUM -> {
+                    if (premiumTileRes != null) {
+                        Image(
+                            painter = painterResource(id = premiumTileRes),
+                            contentDescription = label,
+                            modifier = Modifier.size(68.dp)
+                        )
+                    } else {
+                        IOSIconChip(
+                            icon = icon,
+                            tint = MaterialTheme.colorScheme.primary,
+                            chipSize = 68.dp,
+                            iconSize = 36.dp,
+                            cornerRadius = 14.dp,
+                            backgroundAlpha = 0.12f,
+                            contentDescription = label
+                        )
+                    }
                 }
                 AppTheme.OLEG_SMILE_LIGHT -> {
                     if (lightTileRes != null) {
@@ -592,6 +636,32 @@ fun QuickAccessButton(
             )
         }
     }
+}
+
+/**
+ * Рендерить користувацьке фото для плитки з файлу. Використовується
+ * у [QuickAccessButton], коли в [LocalUserTilePhotos] є запис
+ * для відповідного `tileId`.
+ */
+@Composable
+private fun UserTilePhoto(
+    path: String,
+    label: String,
+    size: androidx.compose.ui.unit.Dp,
+    corner: androidx.compose.ui.unit.Dp
+) {
+    val context = LocalContext.current
+    val request = androidx.compose.runtime.remember(path) {
+        ImageRequest.Builder(context).data(File(path)).build()
+    }
+    AsyncImage(
+        model = request,
+        contentDescription = label,
+        modifier = Modifier
+            .size(size)
+            .clip(RoundedCornerShape(corner)),
+        contentScale = ContentScale.Crop
+    )
 }
 
 /**

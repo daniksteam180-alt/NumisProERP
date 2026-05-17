@@ -130,13 +130,17 @@ class MainActivity : ComponentActivity() {
             val fontSize by settingsManager.fontSizeState
             val fontColor by settingsManager.fontColorState
             val backgroundImagePath by settingsManager.backgroundImagePathState
+            val tilePhotoPaths by settingsManager.tilePhotoPathsState
+            val tileBackgroundAlpha by settingsManager.tileBackgroundAlphaState
             var splashFinished by rememberSaveable { mutableStateOf(false) }
             NumisProERPTheme(
                 appTheme = theme,
                 fontFamilyKey = fontFamily,
                 fontSizeSp = fontSize,
                 fontColorHex = fontColor,
-                backgroundImagePath = backgroundImagePath
+                backgroundImagePath = backgroundImagePath,
+                tilePhotoPaths = tilePhotoPaths,
+                tileBackgroundAlpha = tileBackgroundAlpha
             ) {
                 CompositionLocalProvider(LocalAppLanguage provides language) {
                     Surface(
