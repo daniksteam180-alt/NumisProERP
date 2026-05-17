@@ -190,7 +190,10 @@ fun NumisProERPNavigation() {
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                drawerContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.96f)
+                // Беремо `surface`, а не `background`, бо при ввімкненому користувацькому
+                // фоновому малюнку `colorScheme.background` стає прозорим (Color.Transparent
+                // має RGB 0,0,0), і `.copy(alpha = 0.96f)` дав би майже непрозорий чорний.
+                drawerContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
                 LazyColumn(
