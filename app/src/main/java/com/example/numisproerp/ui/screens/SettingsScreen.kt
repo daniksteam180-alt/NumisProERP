@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Check
@@ -123,6 +124,10 @@ fun SettingsScreen(
     var showDataDialog by remember { mutableStateOf(false) }
     var showFontsDialog by remember { mutableStateOf(false) }
     var showBackgroundDialog by remember { mutableStateOf(false) }
+    var showTileIconsDialog by remember { mutableStateOf(false) }
+    // Поточна плитка, для якої запускається picker (`tileId`). Зберігаємо тут,
+    // щоб після повернення з image-picker зрозуміти, куди писати файл.
+    var pickerTileId by remember { mutableStateOf("") }
     var showResetDialog by remember { mutableStateOf(false) }
     var resetConfirmation by remember { mutableStateOf("") }
     val resetDoneText = tr("Усі дані видалено", "All data cleared")
@@ -239,6 +244,35 @@ fun SettingsScreen(
         }
     }
 
+    // Picker для фото плиток головного меню. Зберігаємо файл як `tile_<id>.jpg`
+    // у внутрішньому сховищі додатку. Шлях йде в SettingsManager під ключем
+    // `tile_photo_<id>`, звідки його зчитує `QuickAccessButton`.
+    val tilePhotoSetText = tr("Фото значка встановлено", "Tile photo set")
+    val tilePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        val tileId = pickerTileId
+        if (uri != null && tileId.isNotBlank()) {
+            scope.launch {
+                val target = File(context.filesDir, "tile_$tileId.jpg")
+                try {
+                    val stream = context.contentResolver.openInputStream(uri)
+                    if (stream != null) {
+                        stream.use { input ->
+                            FileOutputStream(target).use { output -> input.copyTo(output) }
+                        }
+                        settings.setTilePhotoPath(tileId, target.absolutePath)
+                        Toast.makeText(context, tilePhotoSetText, Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, bgErrorText, Toast.LENGTH_SHORT).show()
+                    }
+                } catch (_: Exception) {
+                    Toast.makeText(context, bgErrorText, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -313,6 +347,19 @@ fun SettingsScreen(
                     subtitle = if (settings.backgroundImagePath.isNotBlank())
                         tr("Встановлено", "Set") else tr("Не вибрано", "Not set"),
                     onClick = { showBackgroundDialog = true }
+                )
+            }
+            item {
+                val customPhotosCount = settings.tilePhotoPathsState.value.size
+                val alphaPct = (settings.tileBackgroundAlphaState.value * 100).toInt()
+                SettingsButton(
+                    icon = Icons.Default.Apps,
+                    title = tr("Значки головного меню", "Main menu icons"),
+                    subtitle = tr(
+                        "Фото: $customPhotosCount/8 · Прозорість: $alphaPct%",
+                        "Photos: $customPhotosCount/8 · Opacity: $alphaPct%"
+                    ),
+                    onClick = { showTileIconsDialog = true }
                 )
             }
 
@@ -458,6 +505,18 @@ fun SettingsScreen(
             onPickImage = { bgPickerLauncher.launch("image/*") },
             onRemove = { settings.backgroundImagePath = "" },
             onDismiss = { showBackgroundDialog = false }
+        )
+    }
+
+    if (showTileIconsDialog) {
+        TileIconsDialog(
+            settings = settings,
+            onPickPhoto = { tileId ->
+                pickerTileId = tileId
+                tilePickerLauncher.launch("image/*")
+            },
+            onRemovePhoto = { tileId -> settings.setTilePhotoPath(tileId, "") },
+            onDismiss = { showTileIconsDialog = false }
         )
     }
 
@@ -737,6 +796,118 @@ private fun FontsDialog(settings: SettingsManager, onDismiss: () -> Unit) {
                             onClick = { settings.fontColor = hex },
                             colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.primary)
                         )
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(tr("Готово", "Done")) } }
+    )
+}
+
+// ======================== Tile icons dialog ========================
+
+/**
+ * Діалог для керування значками головного меню (плитками швидкого доступу).
+ * - Для кожного з 8 `tileId` дозволяє вибрати власне фото (через переданий
+ *   `onPickPhoto`) і прибрати фото (через `onRemovePhoto`).
+ * - Один глобальний повзунок керує прозорістю фону всіх плиток
+ *   (записує в `settings.tileBackgroundAlpha`).
+ */
+@Composable
+private fun TileIconsDialog(
+    settings: SettingsManager,
+    onPickPhoto: (tileId: String) -> Unit,
+    onRemovePhoto: (tileId: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val photos by settings.tilePhotoPathsState
+    var alpha by settings.tileBackgroundAlphaState
+
+    // Назви + accent кольори для відображення в діалозі. Mapping tileId -> (Ua, En, accent).
+    data class TileLabel(val id: String, val ua: String, val en: String)
+    val labels = remember {
+        listOf(
+            TileLabel("purchase", "Закупівля", "Purchase"),
+            TileLabel("sale", "Продаж", "Sale"),
+            TileLabel("stock", "Склад", "Stock"),
+            TileLabel("clients", "Клієнти", "Clients"),
+            TileLabel("reports", "Звіти", "Reports"),
+            TileLabel("suppliers", "Постачальники", "Suppliers"),
+            TileLabel("expenses", "Витрати", "Expenses"),
+            TileLabel("collection", "Моя колекція", "Collection")
+        )
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(tr("Значки головного меню", "Main menu icons")) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Глобальний повзунок прозорості фону плитки.
+                val alphaPct = (alpha * 100).toInt()
+                Text(
+                    tr("Прозорість фону значка: $alphaPct%", "Tile background opacity: $alphaPct%"),
+                    fontSize = 13.sp, fontWeight = FontWeight.SemiBold
+                )
+                Slider(
+                    value = alpha,
+                    onValueChange = { settings.tileBackgroundAlpha = it },
+                    valueRange = 0f..1f
+                )
+                Text(
+                    tr(
+                        "0% — повністю прозорий фон, 100% — як у системних іконках.",
+                        "0% — fully transparent background, 100% — like system icons."
+                    ),
+                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    tr("Фото для значків", "Tile photos"),
+                    fontSize = 13.sp, fontWeight = FontWeight.SemiBold
+                )
+
+                labels.forEach { tile ->
+                    val hasPhoto = photos[tile.id].orEmpty().isNotBlank()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                tr(tile.ua, tile.en),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                if (hasPhoto) tr("Фото встановлено", "Photo set")
+                                else tr("Стандартний значок", "Default icon"),
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                        TextButton(onClick = { onPickPhoto(tile.id) }) {
+                            Text(
+                                if (hasPhoto) tr("Замінити", "Replace")
+                                else tr("Вибрати", "Choose"),
+                                fontSize = 13.sp
+                            )
+                        }
+                        if (hasPhoto) {
+                            TextButton(onClick = { onRemovePhoto(tile.id) }) {
+                                Text(
+                                    tr("Видалити", "Remove"),
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
                     }
                 }
             }

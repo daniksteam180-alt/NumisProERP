@@ -177,6 +177,8 @@ fun NumisProERPTheme(
     fontSizeSp: Int = SettingsManager.DEFAULT_FONT_SIZE,
     fontColorHex: String = "",
     backgroundImagePath: String = "",
+    tilePhotoPaths: Map<String, String> = emptyMap(),
+    tileBackgroundAlpha: Float = SettingsManager.DEFAULT_TILE_BG_ALPHA,
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
@@ -220,7 +222,9 @@ fun NumisProERPTheme(
 
     CompositionLocalProvider(
         LocalAppTheme provides appTheme,
-        LocalDensity provides scaledDensity
+        LocalDensity provides scaledDensity,
+        LocalUserTilePhotos provides tilePhotoPaths,
+        LocalTileBackgroundAlpha provides tileBackgroundAlpha
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
